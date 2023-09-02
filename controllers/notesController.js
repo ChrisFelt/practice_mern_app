@@ -6,19 +6,22 @@ const asyncHandler = require('express-async-handler')
 // @route GET /notes
 // @access Private
 const getAllNotes = asyncHandler(async (req, res) => {
-    // Get all notes from MongoDB
+    // query db for all notes
     const notes = await Note.find().lean()
 
-    // If no notes 
     if (!notes?.length) {
         return res.status(400).json({ message: 'No notes found' })
     }
 
     // Add username to each note before sending the response 
     // See Promise.all with map() here: https://youtu.be/4lqJBBEpjRE 
-    // You could also do this with a for...of loop
+    // Promises.all() takes an iterable of promises and returns a single promise
+    // map applies the function to each item in the array
     const notesWithUser = await Promise.all(notes.map(async (note) => {
+        // user attribute in Note only contains the user's id
+        // query db for username using the user id in the note
         const user = await User.findById(note.user).lean().exec()
+        // ... notation expands the array contents in place
         return { ...note, username: user.username }
     }))
 
@@ -31,7 +34,7 @@ const getAllNotes = asyncHandler(async (req, res) => {
 const createNewNote = asyncHandler(async (req, res) => {
     const { user, title, text } = req.body
 
-    // Confirm data
+    // verify data
     if (!user || !title || !text) {
         return res.status(400).json({ message: 'All fields are required' })
     }
@@ -60,7 +63,7 @@ const createNewNote = asyncHandler(async (req, res) => {
 const updateNote = asyncHandler(async (req, res) => {
     const { id, user, title, text, completed } = req.body
 
-    // Confirm data
+    // verify data
     if (!id || !user || !title || !text || typeof completed !== 'boolean') {
         return res.status(400).json({ message: 'All fields are required' })
     }
@@ -80,6 +83,7 @@ const updateNote = asyncHandler(async (req, res) => {
         return res.status(409).json({ message: 'Duplicate note title' })
     }
 
+    // assign updated values and save to db
     note.user = user
     note.title = title
     note.text = text
@@ -96,7 +100,7 @@ const updateNote = asyncHandler(async (req, res) => {
 const deleteNote = asyncHandler(async (req, res) => {
     const { id } = req.body
 
-    // Confirm data
+    // verify data
     if (!id) {
         return res.status(400).json({ message: 'Note ID required' })
     }
@@ -108,6 +112,7 @@ const deleteNote = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: 'Note not found' })
     }
 
+    // delete the note from the db
     const result = await note.deleteOne()
 
     const reply = `Note '${result.title}' with ID ${result._id} deleted`
